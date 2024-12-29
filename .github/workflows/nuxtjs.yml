@@ -1,0 +1,190 @@
+import pandas as pd
+from matplotlib import pyplot as plt
+import mysql.connector
+
+# SQL Connection
+mydb = mysql.connector.connect(host="localhost", user="root", password="2203@atharva", database="CITY_MALL")
+mycursor = mydb.cursor()
+
+# Creating Tables
+mycursor.execute("""
+CREATE TABLE IF NOT EXISTS products (
+    s_no INT,
+    product_name VARCHAR(255) PRIMARY KEY,
+    category VARCHAR(255),
+    quantity INT,
+    manufacturing_date DATE,
+    expiry_date DATE,
+    price DECIMAL(10, 2)
+);
+""")
+mycursor.execute("""
+CREATE TABLE IF NOT EXISTS sales (
+    product_name VARCHAR(255),
+    FOREIGN KEY (product_name) REFERENCES products(product_name),
+    january INT DEFAULT 9,
+    february INT DEFAULT 9,
+    march INT DEFAULT 9,
+    april INT DEFAULT 9,
+    may INT DEFAULT 9,
+    june INT DEFAULT 9,
+    july INT DEFAULT 9,
+    august INT DEFAULT 9,
+    september INT DEFAULT 9,
+    october INT DEFAULT 9,
+    november INT DEFAULT 9,
+    december INT DEFAULT 9
+);
+""")
+mydb.commit()
+
+# Insert Default Data into 'products' Table
+mycursor.execute("""
+INSERT IGNORE INTO products (s_no, product_name, category, quantity, manufacturing_date, expiry_date, price) 
+VALUES 
+    (1, 'BrewCraft Coffee', 'Food & Beverages', 637, '2024-05-20', '2026-05-20', 250),
+    (2, 'CozyNest Throw', 'home_decoration', 500, '2024-01-15', NULL, 1000),
+    (3, 'GlimmerPad Tablet', 'Accessories', 859, '2023-11-10', NULL, 120),
+    (4, 'HarvestMorn Granola', 'Food & Beverages', 285, '2023-08-12', '2026-08-12', 800),
+    (5, 'LuxeGlow Lamp', 'home_decoration', 50, '2023-11-01', '2026-11-01', 50.8),
+    (6, 'NanoNest Speaker', 'Accessories', 348, '2024-02-18', NULL, 1500),
+    (7, 'RadianceBurst Mask', 'Beauty products', 859, '2024-07-01', '2027-07-01', 300),
+    (8, 'Soccer Ball', 'sports', 300, '2023-06-01', NULL, 200),
+    (9, 'Tennis Racket', 'sports', 700, '2024-03-10', NULL, 150),
+    (10, 'Velvet Foundation', 'Beauty products', 745, '2024-06-01', '2026-06-01', 500);
+""")
+mydb.commit()
+
+# Insert Default Data into 'sales' Table
+mycursor.execute("""
+INSERT IGNORE INTO sales (product_name, january, february, march, april, may, june, july, august, september, october) 
+VALUES 
+    ('BrewCraft Coffee', 12, 15, 19, 21, 23, 25, 29, 31, 33, 36),
+    ('CozyNest Throw', 41, 44, 46, 48, 51, 54, 56, 59, 62, 67),
+    ('GlimmerPad Tablet', 71, 73, 75, 77, 80, 82, 84, 86, 91, 93),
+    ('HarvestMorn Granola', 98, 3, 9, 10, 13, 17, 18, 24, 26, 28),
+    ('LuxeGlow Lamp', 32, 34, 37, 39, 42, 45, 49, 52, 55, 57),
+    ('NanoNest Speaker', 63, 65, 68, 70, 72, 50, 74, 78, 81, 83),
+    ('RadianceBurst Mask', 88, 90, 92, 94, 97, 4, 6, 8, 11, 14),
+    ('Soccer Ball', 20, 27, 29, 67, 75, 43, 50, 53, 58, 66),
+    ('Tennis Racket', 79, 80, 84, 89, 67, 46, 65, 87, 75, 76),
+    ('Velvet Foundation', 90, 56, 78, 88, 91, 94, 99, 1, 10, 19);
+""")
+mydb.commit()
+
+# Function to add a new product
+def add_product():
+    print("\nAdd a New Product")
+    try:
+        s_no = int(input("Enter Serial Number: "))
+        product_name = input("Enter Product Name: ")
+        category = input("Enter Category: ")
+        quantity = int(input("Enter Quantity: "))
+        manufacturing_date = input("Enter Manufacturing Date (YYYY-MM-DD): ")
+        expiry_date = input("Enter Expiry Date (YYYY-MM-DD, leave blank if none): ")
+        price = float(input("Enter Price: "))
+
+        mycursor.execute("""
+        INSERT INTO products (s_no, product_name, category, quantity, manufacturing_date, expiry_date, price)
+        VALUES (%s, %s, %s, %s, %s, %s, %s);
+        """, (s_no, product_name, category, quantity, manufacturing_date, expiry_date if expiry_date else None, price))
+        mydb.commit()
+        print("Product added successfully!")
+    except Exception as e:
+        print(f"Error adding product: {e}")
+
+# Function to add or update sales data
+def add_sales():
+    print("\nAdd or Update Sales Data")
+    try:
+        product_name = input("Enter the Product Name: ")
+
+        # Check if product exists
+        mycursor.execute("SELECT * FROM products WHERE product_name = %s;", (product_name,))
+        if not mycursor.fetchone():
+            print("Product not found. Please add the product first.")
+            return
+
+        sales_data = {}
+        for month in ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "novemeber", "december"]:
+            sales_data[month] = input(f"Enter sales for {month.capitalize()} (leave blank for 0): ") or 0
+
+        mycursor.execute("""
+        INSERT INTO sales (product_name, january, february, march, april, may, june, july, august, september, october, november, december)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            january = VALUES(january), february = VALUES(february), march = VALUES(march),
+            april = VALUES(april), may = VALUES(may), june = VALUES(june), july = VALUES(july),
+            august = VALUES(august), september = VALUES(september), october = VALUES(october), 
+            november = VALUES(november), december = VALUES(december);
+        """, (product_name, *map(int, sales_data.values())))
+        mydb.commit()
+        print("Sales data added/updated successfully!")
+    except Exception as e:
+        print(f"Error adding/updating sales: {e}")
+
+# Visualization Function
+def visualize_sales():
+    try:
+        sales = pd.read_sql("SELECT * FROM sales", mydb)
+        show = input("Do you want to see all products or a specific product? (Type 'a' for all, 's' for specific): ")
+
+        if show == "a":
+            sales['Total_Sales'] = sales.iloc[:, 1:].sum(axis=1)
+            plt.figure(figsize=(12, 6))
+            plt.bar(sales['product_name'], sales['Total_Sales'], color='skyblue')
+            plt.xlabel('Product Name')
+            plt.ylabel('Total Sales (January - December)')
+            plt.title('Total Sales per Product')
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            plt.show()
+        elif show == "s":
+            product_name = input("Enter the product name: ")
+            product_sales = sales[sales['product_name'] == product_name]
+            if product_sales.empty:
+                print("Product not found.")
+            else:
+                monthly_sales = product_sales.drop(columns=['product_name']).iloc[0]
+                monthly_sales.index = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+                plt.figure(figsize=(10, 5))
+                monthly_sales.plot(kind='line', marker='o', color='blue')
+                plt.xlabel('Month')
+                plt.ylabel('Sales')
+                plt.title(f"Monthly Sales for {product_name}")
+                plt.grid()
+                plt.show()
+    except Exception as e:
+        print(f"Error visualizing sales: {e}")
+
+# Main Menu
+while True:
+    print("\nWelcome to CITY MALL")
+    print("1. Add a New Product")
+    print("2. Add or Update Sales Data")
+    print("3. View Products Table")
+    print("4. View Sales Table")
+    print("5. Visualize Sales")
+    print("6. Exit")
+
+    choice = input("Enter your choice: ")
+
+    if choice == "1":
+        add_product()
+    elif choice == "2":
+        add_sales()
+    elif choice == "3":
+        products = pd.read_sql("SELECT * FROM products", mydb)
+        print("\nProducts Table:")
+        print(products)
+    elif choice == "4":
+        sales = pd.read_sql("SELECT * FROM sales", mydb)
+        print("\nSales Table:")
+        print(sales)
+    elif choice == "5":
+        visualize_sales()
+    elif choice == "6":
+        print("Thank you for using City Mall software!")
+        break
+    else:
+        print("Invalid choice. Please try again.")
